@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>닥터 퀴즈의 긴급구조: 독감 퇴치 작전</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            color: white;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        .hospital-bg {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            position: relative;
+        }
+        .header-font {
+            font-family: 'Black Han Sans', sans-serif;
+        }
+        .patient {
+            transition: all 0.5s ease;
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
+        }
+        .patient-sick { transform: scale(0.9) rotate(5deg); opacity: 0.6; filter: grayscale(1) blur(1px); }
+        .patient-healthy { transform: scale(1.1); filter: drop-shadow(0 0 20px #4ade80); }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .emergency { animation: pulse-red 2s infinite; }
+        .btn-hover:active { transform: scale(0.95); }
+        
+        .feedback-pop {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            font-weight: bold;
+            z-index: 100;
+            pointer-events: none;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #ef4444;
+            border-radius: 1.5rem;
+            padding: 1.5rem;
+            min-width: 200px;
+            text-align: center;
+        }
+        .speech-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border: 20px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.7);
+            border-bottom: 0;
+            margin-left: -20px;
+            margin-bottom: -20px;
+        }
+    </style>
+</head>
+<body class="hospital-bg min-h-screen flex items-center justify-center p-2">
+
+    <div id="game-container" class="w-full max-w-5xl bg-slate-800/80 rounded-3xl border-4 border-cyan-500 shadow-2xl p-4 md:p-6 relative overflow-hidden hidden">
+        
+        <!-- 상단 바: 길이를 늘린 Vital Signs -->
+        <div class="flex flex-col mb-6 bg-black/40 p-4 rounded-xl border border-cyan-900">
+            <div class="flex justify-between items-center mb-2">
+                <span class="text-xs text-cyan-400 font-bold tracking-widest">PATIENT VITAL SIGNS (LIFE RADIUS)</span>
+                <div class="text-xl font-bold text-white header-font"><span id="current-step">1</span> / 12</div>
+            </div>
+            <div class="h-6 bg-slate-900 w-full rounded-full overflow-hidden border border-cyan-800 shadow-inner">
+                <div id="health-bar" class="h-full bg-gradient-to-r from-red-600 via-yellow-500 to-green-500 transition-all duration-700 shadow-[0_0_15px_rgba(74,222,128,0.5)]" style="width: 50%"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+            <!-- 왼쪽: 환자 영역 -->
+            <div class="md:col-span-4 flex flex-col items-center justify-center space-y-6 py-4">
+                <div id="patient-bubble-container" class="speech-bubble border-cyan-500 scale-110 shadow-lg">
+                    <div id="patient-message" class="text-lg md:text-xl font-bold text-white leading-tight">
+                        "의사 선생님, 도와주세요..."
+                    </div>
+                </div>
+                <div id="patient-container" class="relative mt-4">
+                    <div id="patient-emoji" class="text-[120px] patient">🤒</div>
+                    <div id="status-icon" class="absolute -top-4 -right-4 text-4xl">🦠</div>
+                </div>
+            </div>
+
+            <!-- 오른쪽: 퀴즈 영역 -->
+            <div id="quiz-area" class="md:col-span-8 bg-slate-700/50 p-6 rounded-2xl border border-slate-600 flex flex-col h-full min-h-[350px]">
+                <div id="question-type" class="text-cyan-400 text-sm mb-2 font-bold uppercase tracking-wider">진단 중...</div>
+                <div id="question-text" class="text-xl md:text-3xl font-bold mb-6 leading-relaxed text-white border-b border-slate-600 pb-5">
+                    Loading medical data...
+                </div>
+                
+                <div id="options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- 버튼들 -->
+                </div>
+
+                <div id="input-container" class="hidden space-y-4">
+                    <input type="text" id="answer-input" class="w-full bg-black/40 border-2 border-cyan-600 rounded-xl p-4 text-white text-2xl focus:outline-none focus:border-cyan-400 text-center" placeholder="ANSWER HERE">
+                    <button onclick="checkInputAnswer()" class="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl font-bold text-xl btn-hover shadow-lg border-b-4 border-cyan-800">정답 제출 버튼</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 시작 화면 -->
+    <div id="start-screen" class="text-center p-8 max-w-2xl bg-slate-900 border-4 border-cyan-500 rounded-3xl shadow-2xl">
+        <h1 class="text-4xl md:text-6xl header-font text-cyan-400 mb-6 drop-shadow-lg">닥터 퀴즈의 긴급구조:<br>독감 퇴치 작전</h1>
+        <p class="text-lg md:text-xl text-slate-300 mb-8 leading-relaxed">
+            오늘 당신은 의사이며, 환자는 극심한 독감으로 힘들어하고 있습니다.<br>
+            부디 당신의 치료로 이 환자를 살려주세요.
+        </p>
+        <button onclick="startGame()" class="bg-red-600 hover:bg-red-500 text-white text-2xl font-bold px-12 py-6 rounded-full shadow-2xl transform transition hover:scale-110 active:scale-95 border-b-8 border-red-800 header-font">
+            치료 시작하기 (Sound On)
+        </button>
+    </div>
+
+    <!-- 결과 화면 -->
+    <div id="result-screen" class="hidden text-center p-8 max-w-2xl bg-slate-900 border-4 border-cyan-500 rounded-3xl shadow-2xl">
+        <div id="result-emoji" class="text-8xl mb-6">🏆</div>
+        <h2 id="result-title" class="text-4xl header-font text-cyan-400 mb-4">당신이 명의입니다!</h2>
+        <p id="result-score" class="text-xl text-slate-300 mb-8"></p>
+        <button onclick="resetGame()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xl font-bold px-10 py-4 rounded-full shadow-lg btn-hover header-font">
+            다시 진료하기
+        </button>
+    </div>
+
+    <div id="feedback-pop" class="feedback-pop">Great!</div>
+
+    <script>
+        const words = [
+            { word: 'animal', desc: 'a living thing that is not a human being or plant', type: 'choice' },
+            { word: 'more', desc: 'a larger number or amount of', type: 'input' },
+            { word: 'dangerous', desc: 'likely to cause harm or injury', type: 'ox', ox: true },
+            { word: 'village', desc: 'a small town in the countryside', type: 'choice' },
+            { word: 'feed', desc: 'to give food to an animal or a person', type: 'input' },
+            { word: 'farm', desc: 'a place for growing vegetables or keeping animals', type: 'ox', ox: true },
+            { word: 'forest', desc: 'a large area of land covered with trees', type: 'choice' },
+            { word: 'grow', desc: 'to become larger in size', type: 'input' },
+            { word: 'present', desc: 'something that you give to someone as a gift', type: 'ox', ox: true },
+            { word: 'worried', desc: 'nervous or afraid about something bad that might happen', type: 'choice' },
+            { word: 'volunteer', desc: 'to offer to do something without being forced to or without getting paid to do', type: 'input' },
+            { word: 'order', desc: 'to ask for food or drink in a restaurant', type: 'ox', ox: true }
+        ];
+
+        const dummyWords = ['hospital', 'doctor', 'medicine', 'nature', 'health', 'travel', 'mountain', 'ocean'];
+        
+        const sickMessages = [
+            "윽... 선생님, 몸이 더 안 좋아졌어요!",
+            "아파요... 제대로 치료해주시는 거 맞죠?",
+            "살려주세요... 정신이 혼미해요...",
+            "콜록콜록! 가슴이 너무 답답해요.",
+            "치료가 잘못된 것 같아요... 으으.",
+            "선생님... 저 이러다 큰일 나겠어요!"
+        ];
+
+        let currentIdx = 0;
+        let score = 0;
+        let health = 50;
+        let audioCtx = null;
+        let bgmSource = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playTone(freq, duration, type = 'sine', volume = 0.1, startTime = 0) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime + startTime);
+            gain.gain.setValueAtTime(volume, audioCtx.currentTime + startTime);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + startTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + startTime);
+            osc.stop(audioCtx.currentTime + startTime + duration);
+        }
+
+        // 임팩트 있는 정답 효과음 (아르페지오)
+        function playImpactSuccessSound() {
+            const base = 523.25; // C5
+            const melody = [0, 4, 7, 12, 16]; // Major chord scale steps
+            melody.forEach((step, index) => {
+                const freq = base * Math.pow(2, step / 12);
+                playTone(freq, 0.6, 'sine', 0.25, index * 0.08);
+            });
+            // 마지막 팡파르
+            setTimeout(() => playTone(1046.50, 0.8, 'sine', 0.2), 400);
+        }
+
+        function startBGM() {
+            if (bgmSource) return;
+            bgmSource = true;
+            const playBeat = () => {
+                if (!bgmSource) return;
+                const now = audioCtx.currentTime;
+                for(let i=0; i<8; i++) {
+                    playTone(60, 0.1, 'square', 0.03, i * 0.25);
+                    if(i % 2 === 0) playTone(220, 0.05, 'triangle', 0.02, i * 0.25);
+                }
+                setTimeout(playBeat, 2000);
+            };
+            playBeat();
+        }
+
+        function startGame() {
+            initAudio();
+            audioCtx.resume();
+            startBGM();
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            const q = words[currentIdx];
+            document.getElementById('current-step').innerText = currentIdx + 1;
+            document.getElementById('answer-input').value = '';
+            
+            const typeLabel = document.getElementById('question-type');
+            const qText = document.getElementById('question-text');
+            const options = document.getElementById('options-container');
+            const inputArea = document.getElementById('input-container');
+            
+            options.innerHTML = '';
+            options.classList.add('hidden');
+            inputArea.classList.add('hidden');
+
+            if (q.type === 'choice') {
+                typeLabel.innerText = '영영풀이에 알맞은 단어는?';
+                qText.innerText = q.desc;
+                options.classList.remove('hidden');
+                
+                const choices = [q.word, ...dummyWords.sort(() => 0.5 - Math.random()).slice(0, 3)];
+                choices.sort(() => 0.5 - Math.random()).forEach(choice => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full bg-slate-600 hover:bg-cyan-700 p-4 rounded-xl text-left font-bold transition border-l-8 border-transparent hover:border-cyan-400 btn-hover text-lg md:text-xl";
+                    btn.innerText = choice;
+                    btn.onclick = () => checkAnswer(choice);
+                    options.appendChild(btn);
+                });
+            } else if (q.type === 'input') {
+                typeLabel.innerText = '빈칸에 답을 직접 입력하세요.';
+                qText.innerText = q.desc.replace(new RegExp(q.word, 'gi'), '_______');
+                inputArea.classList.remove('hidden');
+            } else if (q.type === 'ox') {
+                typeLabel.innerText = '맞으면 O 틀리면 X를 선택하세요.';
+                const isFake = Math.random() > 0.5;
+                const displayDesc = isFake ? words[(currentIdx + 1) % 12].desc : q.desc;
+                qText.innerText = `${q.word.toUpperCase()} :\n"${displayDesc}"`;
+                q.currentOx = !isFake;
+                
+                options.classList.remove('hidden');
+                options.className = "grid grid-cols-2 gap-4";
+                const btnO = document.createElement('button');
+                btnO.className = "bg-green-600 hover:bg-green-500 p-8 rounded-xl text-5xl font-bold btn-hover shadow-lg border-b-8 border-green-800";
+                btnO.innerText = 'O';
+                btnO.onclick = () => checkAnswer(true);
+                
+                const btnX = document.createElement('button');
+                btnX.className = "bg-red-600 hover:bg-red-500 p-8 rounded-xl text-5xl font-bold btn-hover shadow-lg border-b-8 border-red-800";
+                btnX.innerText = 'X';
+                btnX.onclick = () => checkAnswer(false);
+                
+                options.appendChild(btnO);
+                options.appendChild(btnX);
+            }
+        }
+
+        function checkInputAnswer() {
+            const val = document.getElementById('answer-input').value.trim().toLowerCase();
+            if(!val) return;
+            checkAnswer(val);
+        }
+
+        function checkAnswer(userAns) {
+            const q = words[currentIdx];
+            let isCorrect = false;
+
+            if (q.type === 'choice' || q.type === 'input') {
+                isCorrect = (userAns === q.word);
+            } else if (q.type === 'ox') {
+                isCorrect = (userAns === q.currentOx);
+            }
+
+            if (isCorrect) {
+                score++;
+                health = Math.min(100, health + 15); // 더 큰 폭으로 상승
+                playImpactSuccessSound(); 
+                showFeedback('Great!', '#4ade80');
+                updatePatientUI(true);
+            } else {
+                health = Math.max(0, health - 20); // 더 큰 폭으로 하락
+                playTone(150, 0.8, 'sawtooth', 0.2); // 오답음
+                showFeedback('Oh no.', '#f87171');
+                updatePatientUI(false);
+            }
+
+            currentIdx++;
+            setTimeout(() => {
+                if (currentIdx < words.length) {
+                    loadQuestion();
+                } else {
+                    showResult();
+                }
+            }, 1200);
+        }
+
+        function showFeedback(text, color) {
+            const pop = document.getElementById('feedback-pop');
+            pop.innerText = text;
+            pop.style.color = color;
+            pop.style.opacity = '1';
+            pop.style.transform = 'translate(-50%, -50%) scale(1.5)';
+            setTimeout(() => { pop.style.opacity = '0'; }, 800);
+        }
+
+        function updatePatientUI(isCorrect) {
+            const pEmoji = document.getElementById('patient-emoji');
+            const pMsg = document.getElementById('patient-message');
+            const hBar = document.getElementById('health-bar');
+            const bubble = document.getElementById('patient-bubble-container');
+            const sIcon = document.getElementById('status-icon');
+
+            hBar.style.width = health + '%';
+            
+            if (!isCorrect) {
+                pMsg.innerText = `"${sickMessages[Math.floor(Math.random() * sickMessages.length)]}"`;
+                bubble.classList.add('emergency');
+                bubble.style.borderColor = '#ef4444';
+            } else {
+                bubble.classList.remove('emergency');
+                bubble.style.borderColor = '#22d3ee';
+                if (health > 80) {
+                    pEmoji.innerText = '🏃';
+                    pMsg.innerText = '"우와! 몸이 날아갈 것 같아요!"';
+                } else {
+                    pMsg.innerText = '"감사합니다, 조금씩 나아지고 있어요!"';
+                }
+            }
+
+            if (health > 80) {
+                pEmoji.innerText = '🏃';
+                pEmoji.className = 'text-[120px] patient patient-healthy';
+                sIcon.innerText = '✨';
+                hBar.className = 'h-full bg-gradient-to-r from-green-500 to-emerald-300 transition-all duration-700';
+            } else if (health > 30) {
+                pEmoji.innerText = '😊';
+                pEmoji.className = 'text-[120px] patient';
+                sIcon.innerText = '💊';
+                hBar.className = 'h-full bg-gradient-to-r from-yellow-500 to-green-500 transition-all duration-700';
+            } else {
+                pEmoji.innerText = '🤒';
+                pEmoji.className = 'text-[120px] patient patient-sick';
+                sIcon.innerText = '🦠';
+                hBar.className = 'h-full bg-gradient-to-r from-red-700 to-red-500 transition-all duration-700 emergency';
+            }
+        }
+
+        function showResult() {
+            bgmSource = null;
+            document.getElementById('game-container').classList.add('hidden');
+            const screen = document.getElementById('result-screen');
+            screen.classList.remove('hidden');
+            
+            const rEmoji = document.getElementById('result-emoji');
+            const rTitle = document.getElementById('result-title');
+            const rScore = document.getElementById('result-score');
+
+            rScore.innerText = `12문제 중 ${score}문제를 치료했습니다.`;
+
+            if (score >= 10) {
+                rEmoji.innerText = '🩺';
+                rTitle.innerText = '당신이 명의입니다!';
+            } else {
+                rEmoji.innerText = '👨‍⚕️';
+                rTitle.innerText = '치료 보조관 등급입니다! 더 연습해볼까요?';
+            }
+        }
+
+        function resetGame() {
+            currentIdx = 0;
+            score = 0;
+            health = 50;
+            document.getElementById('result-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            const pMsg = document.getElementById('patient-message');
+            pMsg.innerText = '"의사 선생님, 도와주세요..."';
+        }
+
+        document.getElementById('answer-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') checkInputAnswer();
+        });
+    </script>
+</body>
+</html>
